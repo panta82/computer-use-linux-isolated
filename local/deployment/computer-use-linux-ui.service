@@ -1,0 +1,15 @@
+# PANTA: app menu, taskbar and desktop icons for the separate X199 session only.
+[Unit]
+Description=Computer Use separate desktop UI
+Requires=computer-use-linux-desktop.service
+After=computer-use-linux-desktop.service
+PartOf=computer-use-linux-desktop.service
+[Service]
+ExecStart=%h/.local/share/computer-use-linux/desktop-ui.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+# PANTA: restarting the panel must preserve applications launched from it.
+KillMode=process
+[Install]
+WantedBy=computer-use-linux-desktop.service

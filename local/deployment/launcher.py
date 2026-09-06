@@ -18,6 +18,9 @@ if mode == 'computer-use-linux-desktop':
     if len(sys.argv) < 3 or sys.argv[1] != 'run':
         sys.exit('Usage: computer-use-linux-desktop view | run PROGRAM [ARGS...]')
     command = sys.argv[2:]
+    if pathlib.Path(command[0]).name in ('google-chrome', 'google-chrome-stable', 'chrome'):
+        # PANTA: every standard Chrome launch uses the persistent separate profile and Chrome's own sandbox.
+        os.execve('/usr/bin/python3', ['/usr/bin/python3', str(base/'chrome.py'), *command[1:]], env)
 else:
     command = [str(base / 'bin/computer-use-linux'), *sys.argv[1:]]
     if not sys.argv[1:]: command.append('mcp')

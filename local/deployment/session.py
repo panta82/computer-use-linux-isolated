@@ -18,7 +18,7 @@ env.update({
     'XDG_CURRENT_DESKTOP': 'Openbox', 'DESKTOP_SESSION': 'openbox',
     'XDG_CONFIG_HOME': str(BASE / 'config'), 'XDG_CACHE_HOME': str(BASE / 'cache'),
     'XDG_DATA_HOME': str(BASE / 'data'),
-    'XDG_DATA_DIRS': f'{BASE}/runtime/usr/share:/usr/local/share:/usr/share',
+    'XDG_DATA_DIRS': f'{BASE}/runtime/usr/share:{pathlib.Path.home()}/.local/share:/usr/local/share:/usr/share:/var/lib/snapd/desktop:/var/lib/flatpak/exports/share',
     'COMPUTER_USE_LINUX_SESSION_DIR': str(SESSION), 'COMPUTER_USE_LINUX_ISOLATED': '1',
     'NO_AT_BRIDGE': '0', 'GTK_A11Y': 'atspi',
 })
@@ -47,6 +47,7 @@ try:
     wait_for(['xdpyinfo'])
     # PANTA: silence agent X11 bells without changing the main desktop's sound settings.
     wait_for(['xset', 'b', 'off'])
+    wait_for(['xsetroot', '-solid', '#263445'])
     wait_for(['dbus-send', '--session', '--print-reply', '--dest=org.freedesktop.DBus', '/', 'org.freedesktop.DBus.ListNames'])
     launch([str(BASE / 'runtime/usr/bin/openbox'), '--config-file', str(BASE / 'openbox.xml')])
     wait_for([str(BASE / 'runtime/usr/bin/wmctrl'), '-m'])
