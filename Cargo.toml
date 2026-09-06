@@ -20,6 +20,10 @@ path = "src/main.rs"
 name = "computer-use-linux-cosmic"
 path = "src/bin/computer-use-linux-cosmic.rs"
 
+[features]
+# PANTA: deployment build must never recover or inject input into the host session.
+isolated-x11 = []
+
 [dependencies]
 mimalloc = { version = "0.1", default-features = false }
 anyhow = "1.0.102"

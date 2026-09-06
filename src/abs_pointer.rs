@@ -68,6 +68,10 @@ impl AbsPointer {
     /// (the portal screenshot dimensions). Blocks ~`settle` ms so libinput picks
     /// the device up before the first event.
     pub fn create(width: i32, height: i32) -> Result<Self> {
+        anyhow::ensure!(
+            !cfg!(feature = "isolated-x11"),
+            "uinput forbidden in isolated X11 build"
+        );
         let geometry = AbsPointerGeometry::from_dimensions(width, height);
         let (max_x, max_y) = geometry.axis_maxima();
         // value, min, max, fuzz, flat, resolution. resolution=1 unit/px.

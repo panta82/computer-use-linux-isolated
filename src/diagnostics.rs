@@ -211,7 +211,7 @@ pub fn doctor_report() -> DoctorReport {
         &input,
     );
 
-    let capabilities = capability_map_with_portal_keyboard(
+    let mut capabilities = capability_map_with_portal_keyboard(
         &platform,
         &portals,
         &remote_desktop_keyboard,
@@ -220,6 +220,14 @@ pub fn doctor_report() -> DoctorReport {
         &input,
     );
 
+    if cfg!(feature = "isolated-x11") {
+        capabilities.input = vec!["xdotool-isolated-x11-no-fallback".into()];
+        capabilities.screenshot = vec!["isolated-x11".into()];
+        capabilities.isolation =
+            vec!["dedicated X11 and D-Bus session; host input backends forbidden".into()];
+        capabilities.preferred.input = capabilities.input.first().cloned();
+        capabilities.preferred.screenshot = capabilities.screenshot.first().cloned();
+    }
     DoctorReport {
         platform,
         portals,
@@ -380,6 +388,9 @@ fn capability_map_with_portal_keyboard(
 }
 
 pub fn hydrate_session_bus_env() {
+    if cfg!(feature = "isolated-x11") {
+        return;
+    }
     hydrate_common_command_path();
     hydrate_desktop_env_from_process_tree();
     hydrate_desktop_env_from_systemd_user();

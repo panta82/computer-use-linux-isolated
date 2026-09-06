@@ -8,6 +8,7 @@ mod cosmic_helper;
 mod diagnostics_impl;
 mod gnome_extension;
 mod identity;
+mod isolation;
 mod remote_desktop;
 #[path = "screenshot.rs"]
 mod screenshot_impl;

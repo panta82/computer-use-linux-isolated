@@ -554,7 +554,7 @@ impl ComputerUseLinux {
     /// logical desktop (the portal screenshot dimensions). Returns `false` if it
     /// can't be created or is disabled via `CU_DISABLE_ABS_POINTER`.
     async fn ensure_abs_pointer(&self) -> bool {
-        if env_flag_enabled("CU_DISABLE_ABS_POINTER") {
+        if cfg!(feature = "isolated-x11") || env_flag_enabled("CU_DISABLE_ABS_POINTER") {
             return false;
         }
         if self
@@ -1151,6 +1151,34 @@ impl ComputerUseLinux {
                 });
             }
         };
+        if cfg!(feature = "isolated-x11") {
+            let button = match direction {
+                ScrollDirection::Up => "4",
+                ScrollDirection::Down => "5",
+                ScrollDirection::Left => "6",
+                ScrollDirection::Right => "7",
+            };
+            let mut args: Vec<String> = Vec::new();
+            if let Some((x, y)) = target_point {
+                args.extend(["mousemove".into(), x.to_string(), y.to_string()]);
+            }
+            args.extend([
+                "click".into(),
+                "--repeat".into(),
+                units.to_string(),
+                button.into(),
+            ]);
+            let (input_guard, result) = run_cancellation_safe_input(input_guard, async move {
+                run_xdotool_or_fallback(Path::new("xdotool"), &args, || async {
+                    Err("Isolated X11 input unavailable; no fallback".into())
+                })
+                .await
+                .map(|r| vec![r.output])
+            })
+            .await;
+            let _input_guard = input_guard;
+            return Json(action_result("scroll", result, received));
+        }
         let off_screen_note = match target_point {
             Some((x, y)) => self.off_screen_note_for_point(x, y).await,
             None => None,
@@ -1276,6 +1304,30 @@ impl ComputerUseLinux {
     async fn drag(&self, Parameters(params): Parameters<DragParams>) -> Json<ActionOutput> {
         let received = Some(serde_json::json!(params));
         let input_guard = Arc::clone(&self.input_operation_lock).lock_owned().await;
+        if cfg!(feature = "isolated-x11") {
+            let args = vec![
+                "mousemove".into(),
+                params.start_x.to_string(),
+                params.start_y.to_string(),
+                "mousedown".into(),
+                "1".into(),
+                "mousemove".into(),
+                params.end_x.to_string(),
+                params.end_y.to_string(),
+                "mouseup".into(),
+                "1".into(),
+            ];
+            let (input_guard, result) = run_cancellation_safe_input(input_guard, async move {
+                run_xdotool_or_fallback(Path::new("xdotool"), &args, || async {
+                    Err("Isolated X11 input unavailable; no fallback".into())
+                })
+                .await
+                .map(|r| vec![r.output])
+            })
+            .await;
+            let _input_guard = input_guard;
+            return Json(action_result("drag", result, received));
+        }
         // Preferred backend: the uinput absolute pointer (accurate landing).
         if self.ensure_abs_pointer().await {
             let abs_pointer = Arc::clone(&self.abs_pointer);
@@ -1776,6 +1828,9 @@ impl ComputerUseLinux {
 impl ServerHandler for ComputerUseLinux {}
 
 fn shell_execution_enabled() -> bool {
+    if cfg!(feature = "isolated-x11") {
+        return false;
+    }
     shell_execution_enabled_value(env::var(SHELL_ENABLE_ENV).ok().as_deref())
 }
 
@@ -2651,6 +2706,9 @@ impl ComputerUseLinux {
     // `COMPUTER_USE_LINUX_FORCE_YDOTOOL_*=1` always uses ydotool;
     // `COMPUTER_USE_LINUX_FORCE_PORTAL_*=1` always uses the portal.
     async fn should_prefer_portal_pointer_backend(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         if env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_POINTER") {
             return false;
         }
@@ -2664,6 +2722,9 @@ impl ComputerUseLinux {
     }
 
     async fn should_prefer_portal_keyboard_backend(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         if env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD") {
             return false;
         }
@@ -2689,6 +2750,9 @@ impl ComputerUseLinux {
     /// keeps covering key chords; otherwise the portal is preferred only
     /// when ydotool is absent or the portal is forced.
     async fn should_prefer_portal_keyboard_for_chords(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         if env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD") {
             return false;
         }
@@ -2723,6 +2787,9 @@ impl ComputerUseLinux {
     /// `COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD=1` opts out;
     /// `COMPUTER_USE_LINUX_FORCE_XDOTOOL_KEYBOARD=1` forces it on.
     fn should_prefer_xdotool_keyboard(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return true;
+        }
         prefer_xdotool_keyboard(
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD"),
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_XDOTOOL_KEYBOARD"),
@@ -2744,6 +2811,9 @@ impl ComputerUseLinux {
     }
 
     fn should_prefer_xdotool_pointer(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return true;
+        }
         crate::diagnostics::hydrate_session_bus_env();
         prefer_xdotool_pointer(
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_POINTER"),
@@ -4594,6 +4664,9 @@ where
 }
 
 async fn run_ydotool(args: &[String]) -> std::result::Result<Output, String> {
+    if cfg!(feature = "isolated-x11") {
+        return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
+    }
     let support = ydotool::ensure_supported_async().await?;
     let mut command = TokioCommand::new(&support.executable);
     command.args(args);
@@ -4616,6 +4689,9 @@ async fn run_ydotool(args: &[String]) -> std::result::Result<Output, String> {
 }
 
 async fn run_ydotool_type_text(text: &str) -> std::result::Result<Output, String> {
+    if cfg!(feature = "isolated-x11") {
+        return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
+    }
     let support = ydotool::ensure_supported_async().await?;
     let mut command = TokioCommand::new(&support.executable);
     command.args(["type", "--file", "-"]);
@@ -4858,9 +4934,17 @@ async fn run_xdotool(program: &Path, args: &[String]) -> XdotoolAttempt {
     command.kill_on_drop(true);
     command.process_group(0);
 
+    let timeout = if cfg!(feature = "isolated-x11") && args.first().is_some_and(|s| s == "type") {
+        INPUT_COMMAND_TIMEOUT
+            + Duration::from_millis(
+                (args.last().map_or(0, |s| s.chars().count()) as u64).saturating_mul(25),
+            )
+    } else {
+        INPUT_COMMAND_TIMEOUT
+    };
     match command.spawn() {
         Ok(child) => XdotoolAttempt::Finished(
-            match crate::command_runner::output_child(child, "run xdotool", INPUT_COMMAND_TIMEOUT)
+            match crate::command_runner::output_child(child, "run xdotool", timeout)
                 .await
                 .map_err(|error| format!("{error:#}"))
             {
@@ -4961,7 +5045,12 @@ fn xdotool_type_args(text: &str) -> Vec<String> {
         "type".to_string(),
         "--clearmodifiers".to_string(),
         "--delay".to_string(),
-        "0".to_string(),
+        if cfg!(feature = "isolated-x11") && !text.is_ascii() {
+            "25"
+        } else {
+            "0"
+        }
+        .to_string(),
         "--".to_string(),
         text.to_string(),
     ]
@@ -7306,5 +7395,27 @@ mod tests {
             .all(|character| character.is_ascii_hexdigit()));
         assert!(!digest.contains("secret"));
         assert_eq!(digest, shell_command_sha256("printf secret"));
+    }
+}
+
+#[cfg(all(test, feature = "isolated-x11"))]
+mod isolation_tests {
+    use super::*;
+    #[tokio::test]
+    async fn shared_input_is_rejected_before_backend_discovery() {
+        assert!(run_ydotool(&[]).await.unwrap_err().contains("forbidden"));
+        assert!(run_ydotool_type_text("never send this")
+            .await
+            .unwrap_err()
+            .contains("forbidden"));
+        assert!(crate::abs_pointer::AbsPointer::create(100, 100)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("forbidden"));
+    }
+    #[test]
+    fn unicode_typing_allows_keymap_changes_to_reach_clients() {
+        assert_eq!(xdotool_type_args("žđčćš")[3], "25");
     }
 }

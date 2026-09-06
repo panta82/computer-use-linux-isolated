@@ -174,6 +174,9 @@ impl ScreenshotBackend {
 }
 
 pub async fn capture_screenshot_raw() -> Result<RawScreenshotCapture> {
+    if cfg!(feature = "isolated-x11") {
+        return capture_with_x11_import().await;
+    }
     hydrate_session_bus_env();
 
     // Explicit override: use exactly the requested backend, no fallback. Lets
@@ -967,4 +970,29 @@ mod tests {
         assert!(returned.exists());
         let _ = fs::remove_file(returned);
     }
+}
+
+// PANTA: use only this X connection, never host portals or screenshot services.
+async fn capture_with_x11_import() -> Result<RawScreenshotCapture> {
+    let mut command = Command::new("import");
+    command.args(["-window", "root", "png:-"]);
+    let output = crate::command_runner::output_with_timeout(
+        command,
+        "isolated X11 screenshot",
+        std::time::Duration::from_secs(10),
+    )
+    .await?;
+    anyhow::ensure!(
+        output.status.success(),
+        "isolated X11 screenshot failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let (width, height) = png_dimensions(&output.stdout)?;
+    Ok(RawScreenshotCapture {
+        mime_type: "image/png".into(),
+        bytes: output.stdout,
+        source: "isolated-x11".into(),
+        width,
+        height,
+    })
 }
