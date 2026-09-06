@@ -13,16 +13,17 @@ mode = pathlib.Path(sys.argv[0]).name
 if mode == 'computer-use-linux-desktop':
     if sys.argv[1:] == ['view']:
         os.execvp('vncviewer', ['vncviewer', '-PasswordFile', str(base / 'view-password'),
-                  '-SendKeyEvents=0', '-SendPointerEvents=0', '127.0.0.1:99'])
+                  '-SendKeyEvents=1', '-SendPointerEvents=1', '127.0.0.1:99'])
     if len(sys.argv) < 3 or sys.argv[1] != 'run':
         sys.exit('Usage: computer-use-linux-desktop view | run PROGRAM [ARGS...]')
     command = sys.argv[2:]
 else:
     command = [str(base / 'bin/computer-use-linux'), *sys.argv[1:]]
     if not sys.argv[1:]: command.append('mcp')
+# PANTA: expose normal writable files; preserve separate input devices and session sockets.
 # Hide physical devices, shared D-Bus/ydotool sockets, and host filesystem X sockets.
 # MCP also gets a separate network namespace, blocking abstract host X/DBus sockets.
-args = ['/usr/bin/bwrap', '--die-with-parent', '--ro-bind', '/', '/',
+args = ['/usr/bin/bwrap', '--die-with-parent', '--bind', '/', '/',
         '--bind', str(base), str(base), '--dev', '/dev', '--tmpfs', '/run', '--tmpfs', '/tmp',
         '--dir', '/tmp/.X11-unix', '--ro-bind', '/tmp/.X11-unix/X199', '/tmp/.X11-unix/X199']
 if mode != 'computer-use-linux-desktop': args += ['--unshare-net']
