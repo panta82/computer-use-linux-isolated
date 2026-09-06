@@ -131,6 +131,10 @@ pub fn backend_can_exact_focus(id: &str) -> bool {
 }
 
 pub async fn list_windows() -> Result<Vec<WindowInfo>> {
+    // MPX XISetFocus needs actual XIDs, never KWin internal UUID hashes.
+    if cfg!(feature = "mpx") {
+        return x11::list_windows().await;
+    }
     let mut errors = Vec::new();
     for backend in BACKEND_ORDER {
         if let Some(windows) =
@@ -191,6 +195,10 @@ async fn list_windows_for(backend: BackendKind) -> Result<Vec<WindowInfo>> {
 }
 
 pub async fn activate_window(window: &WindowInfo) -> Result<()> {
+    if cfg!(feature = "mpx") {
+        crate::mpx::query("focus", Some(window.window_id))?;
+        return Ok(());
+    }
     match window.backend.as_str() {
         GNOME_SHELL_EXTENSION_BACKEND => gnome::activate_extension_window(window.window_id).await,
         GNOME_SHELL_INTROSPECT_BACKEND => {
@@ -236,6 +244,10 @@ pub async fn focused_window_for_backend(backend: &str) -> Result<Option<WindowIn
 }
 
 pub async fn move_window(window: &WindowInfo, x: i32, y: i32) -> Result<String> {
+    anyhow::ensure!(
+        !cfg!(feature = "mpx"),
+        "Window geometry changes are disabled during MPX focus-isolation trial"
+    );
     match window.backend.as_str() {
         GNOME_SHELL_EXTENSION_BACKEND => {
             gnome::move_extension_window(window.window_id, x, y).await
@@ -248,6 +260,10 @@ pub async fn move_window(window: &WindowInfo, x: i32, y: i32) -> Result<String> 
 }
 
 pub async fn resize_window(window: &WindowInfo, width: i32, height: i32) -> Result<String> {
+    anyhow::ensure!(
+        !cfg!(feature = "mpx"),
+        "Window geometry changes are disabled during MPX focus-isolation trial"
+    );
     match window.backend.as_str() {
         GNOME_SHELL_EXTENSION_BACKEND => {
             gnome::resize_extension_window(window.window_id, width, height).await

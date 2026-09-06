@@ -8,7 +8,14 @@ const FOCUS_VERIFY_TIMEOUT: Duration = Duration::from_secs(1);
 const FOCUS_VERIFY_DELAY: Duration = Duration::from_millis(50);
 
 pub async fn list_windows() -> Result<Vec<WindowInfo>> {
-    registry::list_windows().await
+    let mut windows = registry::list_windows().await?;
+    if cfg!(feature = "mpx") {
+        let id = crate::mpx::query("state", None)?.focus;
+        for window in &mut windows {
+            window.focused = window.window_id == id;
+        }
+    }
+    Ok(windows)
 }
 
 pub async fn focused_window() -> Result<Option<WindowInfo>> {
@@ -24,6 +31,17 @@ pub async fn focus_window_target(target: &WindowTarget) -> Result<WindowFocusRes
     let requested_window = resolve_window_target(&windows, target)?.clone();
     ensure_backend_can_focus_target(target, &requested_window)?;
 
+    if cfg!(feature = "mpx") {
+        let state = crate::mpx::query("focus", Some(requested_window.window_id))?;
+        let mut requested_window = requested_window;
+        requested_window.focused = state.focus == requested_window.window_id;
+        return Ok(WindowFocusResult {
+            backend: "mpx-xi2".into(), focused_window: Some(requested_window.clone()),
+            exact_window_focused: requested_window.focused, app_focused: requested_window.focused,
+            requested_window,
+            note: "Set only the agent XI2 keyboard focus. Did not activate, raise, or switch the user's window/workspace.".into(),
+        });
+    }
     registry::activate_window(&requested_window).await?;
 
     let focused_window = wait_for_focused_window(&requested_window).await;
@@ -59,6 +77,9 @@ pub(crate) fn ensure_backend_can_focus_target(
 }
 
 async fn current_focused_window() -> Result<Option<WindowInfo>> {
+    if cfg!(feature = "mpx") {
+        return Ok(list_windows().await?.into_iter().find(|w| w.focused));
+    }
     if let Some(window) = registry::focused_window_override().await {
         return Ok(Some(window));
     }

@@ -1,0 +1,16 @@
+# PANTA: persistent second X11 pointer/keyboard; never attach physical input devices.
+[Unit]
+Description=Computer Use separate X11 MPX cursor
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/computer-use-linux/mpx/service.py
+Restart=on-failure
+RestartSec=2
+UMask=0077
+TimeoutStopSec=5
+
+[Install]
+WantedBy=graphical-session.target

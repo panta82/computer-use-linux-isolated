@@ -2,6 +2,24 @@
 use anyhow::{ensure, Result};
 
 pub(crate) fn validate_environment() -> Result<()> {
+    if cfg!(feature = "mpx") {
+        ensure!(
+            std::env::var("COMPUTER_USE_MPX").as_deref() == Ok("1"),
+            "MPX launcher is required; no fallback"
+        );
+        ensure!(
+            std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("x11"),
+            "MPX requires native X11"
+        );
+        ensure!(
+            std::env::var("WAYLAND_DISPLAY")
+                .unwrap_or_default()
+                .is_empty(),
+            "MPX refuses Wayland"
+        );
+        crate::mpx::query("state", None)?;
+        return Ok(());
+    }
     let runtime = std::env::var("COMPUTER_USE_LINUX_SESSION_DIR")?;
     ensure!(
         runtime.starts_with('/') && runtime.ends_with("/computer-use-linux/session"),

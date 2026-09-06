@@ -9,6 +9,7 @@ mod diagnostics_impl;
 mod gnome_extension;
 mod identity;
 mod isolation;
+mod mpx;
 mod remote_desktop;
 #[path = "screenshot.rs"]
 mod screenshot_impl;

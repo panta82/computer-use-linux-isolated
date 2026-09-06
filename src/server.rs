@@ -457,14 +457,17 @@ impl ComputerUseLinux {
         let target = params.window_target();
         let target_window = match target.as_ref() {
             Some(target) => Some(
-                self.resolve_screenshot_window(target, params.raise_window.unwrap_or(true))
-                    .await
-                    .map_err(|error| {
-                        ErrorData::internal_error(
-                            format!("targeted screenshot failed: {error:#}"),
-                            None,
-                        )
-                    })?,
+                self.resolve_screenshot_window(
+                    target,
+                    !cfg!(feature = "mpx") && params.raise_window.unwrap_or(true),
+                )
+                .await
+                .map_err(|error| {
+                    ErrorData::internal_error(
+                        format!("targeted screenshot failed: {error:#}"),
+                        None,
+                    )
+                })?,
             ),
             None => None,
         };
@@ -895,7 +898,12 @@ impl ComputerUseLinux {
                 let mut output =
                     action_result("click", result.map(|result| result.outputs), received);
                 if output.ok && used_xdotool {
-                    output.message = "Action sent through xdotool (X11 XTEST).".to_string();
+                    output.message = if cfg!(feature = "mpx") {
+                        "Input routed only to agent MPX devices."
+                    } else {
+                        "Action sent through xdotool (X11 XTEST)."
+                    }
+                    .to_string();
                 }
                 return Json(with_notes(output, off_screen_note));
             }
@@ -934,6 +942,9 @@ impl ComputerUseLinux {
         &self,
         Parameters(params): Parameters<ActionParams>,
     ) -> Json<ActionOutput> {
+        if cfg!(feature = "mpx") {
+            return Json(ActionOutput { ok:false, implemented:true, action:"perform_action".into(), message:"AT-SPI mutation is disabled in MPX trial because apps can change primary focus; use targeted MPX input".into(), received:None });
+        }
         let requested_action = requested_or_primary_action(params.action.as_deref());
         self.perform_element_action(&params, Some(requested_action))
             .await
@@ -953,6 +964,9 @@ impl ComputerUseLinux {
         &self,
         Parameters(params): Parameters<SetValueParams>,
     ) -> Json<ActionOutput> {
+        if cfg!(feature = "mpx") {
+            return Json(ActionOutput { ok:false, implemented:true, action:"set_value".into(), message:"AT-SPI mutation is disabled in MPX trial because apps can change primary focus; use targeted MPX input".into(), received:None });
+        }
         let received = Some(serde_json::json!(params.clone()));
         let object_ref = match self.resolve_object_ref(
             params.element_index,
@@ -1008,6 +1022,9 @@ impl ComputerUseLinux {
         )
     )]
     async fn scroll(&self, Parameters(mut params): Parameters<ScrollParams>) -> Json<ActionOutput> {
+        if cfg!(feature = "mpx") {
+            return Json(ActionOutput { ok:false, implemented:true, action:"scroll".into(), message:"scroll is disabled in the MPX trial: delivery to the application has not been verified; no shared-input fallback".into(), received:None });
+        }
         let received = Some(serde_json::json!(params.clone()));
         let input_guard = Arc::clone(&self.input_operation_lock).lock_owned().await;
         let mut portal_target_point = None;
@@ -1302,6 +1319,9 @@ impl ComputerUseLinux {
         )
     )]
     async fn drag(&self, Parameters(params): Parameters<DragParams>) -> Json<ActionOutput> {
+        if cfg!(feature = "mpx") {
+            return Json(ActionOutput { ok:false, implemented:true, action:"drag".into(), message:"drag is disabled in the MPX trial: delivery to the application has not been verified; no shared-input fallback".into(), received:None });
+        }
         let received = Some(serde_json::json!(params));
         let input_guard = Arc::clone(&self.input_operation_lock).lock_owned().await;
         if cfg!(feature = "isolated-x11") {
@@ -1537,7 +1557,12 @@ impl ComputerUseLinux {
                     focus.clone(),
                 );
                 if used_xdotool {
-                    output.message = "Action sent through xdotool (X11 XTEST).".to_string();
+                    output.message = if cfg!(feature = "mpx") {
+                        "Input routed only to agent MPX devices."
+                    } else {
+                        "Action sent through xdotool (X11 XTEST)."
+                    }
+                    .to_string();
                 }
                 if output.ok && focus.is_some() {
                     let notes = self.input_landing_notes(focus.as_ref(), false).await;
@@ -1717,7 +1742,12 @@ impl ComputerUseLinux {
                 focus.clone(),
             );
             if used_xdotool {
-                output.message = "Action sent through xdotool (X11 XTEST).".to_string();
+                output.message = if cfg!(feature = "mpx") {
+                    "Input routed only to agent MPX devices."
+                } else {
+                    "Action sent through xdotool (X11 XTEST)."
+                }
+                .to_string();
             }
             if output.ok && focus.is_some() {
                 let notes = self.input_landing_notes(focus.as_ref(), true).await;
@@ -3129,6 +3159,9 @@ impl ComputerUseLinux {
         target: &WindowTarget,
     ) -> std::result::Result<Option<WindowFocusResult>, String> {
         if !target.has_target() {
+            if cfg!(feature = "mpx") {
+                return Err("MPX keyboard input requires an explicit window target".into());
+            }
             return Ok(None);
         }
 
@@ -3464,6 +3497,9 @@ impl ComputerUseLinux {
             ));
         }
 
+        if cfg!(feature = "mpx") {
+            return Err("No coordinates for MPX click; AT-SPI action fallback is disabled".into());
+        }
         let Some(action) = primary_action(node.actions.as_slice()) else {
             return Err(format!(
                 "No clickable bounds cached for element_index {}, and the element exposes no primary AT-SPI action.",
@@ -4348,7 +4384,14 @@ fn action_result(
             ok: true,
             implemented: true,
             action: action.to_string(),
-            message: "Action sent through ydotool.".to_string(),
+            message: if cfg!(feature = "mpx") {
+                "Action sent through agent MPX devices; no shared-input fallback."
+            } else if cfg!(feature = "isolated-x11") {
+                "Action sent through isolated X11 input."
+            } else {
+                "Action sent through ydotool."
+            }
+            .to_string(),
             received,
         },
         Err(message) => ActionOutput {
@@ -4927,7 +4970,13 @@ enum XdotoolAttempt {
 }
 
 async fn run_xdotool(program: &Path, args: &[String]) -> XdotoolAttempt {
-    let mut command = TokioCommand::new(program);
+    let mut command = if cfg!(all(feature = "mpx", not(test))) {
+        let mut c = TokioCommand::new("/usr/bin/python3");
+        c.arg(crate::mpx::helper_path());
+        c
+    } else {
+        TokioCommand::new(program)
+    };
     command.args(args);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
@@ -6343,12 +6392,17 @@ mod tests {
             }],
         )]);
 
-        let target = backend
-            .resolve_click_target(&ClickParams {
-                element_index: Some(7),
-                ..Default::default()
-            })
-            .unwrap();
+        let result = backend.resolve_click_target(&ClickParams {
+            element_index: Some(7),
+            ..Default::default()
+        });
+        if cfg!(feature = "mpx") {
+            assert!(result
+                .unwrap_err()
+                .contains("AT-SPI action fallback is disabled"));
+            return;
+        }
+        let target = result.unwrap();
 
         match target {
             ClickTarget::PrimaryAction {
@@ -6385,12 +6439,17 @@ mod tests {
             }],
         )]);
 
-        let target = backend
-            .resolve_click_target(&ClickParams {
-                element_index: Some(7),
-                ..Default::default()
-            })
-            .unwrap();
+        let result = backend.resolve_click_target(&ClickParams {
+            element_index: Some(7),
+            ..Default::default()
+        });
+        if cfg!(feature = "mpx") {
+            assert!(result
+                .unwrap_err()
+                .contains("AT-SPI action fallback is disabled"));
+            return;
+        }
+        let target = result.unwrap();
 
         match target {
             ClickTarget::PrimaryAction {

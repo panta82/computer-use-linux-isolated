@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>MPX Chrome input test</title>
+<style>body{font:20px sans-serif;padding:30px}input,button,select{font:20px sans-serif;margin:15px;padding:10px}dialog{padding:30px}</style>
+<h1>Disposable Chrome input test</h1>
+<label>Browser input <input id="input" autofocus></label>
+<button id="modal" onclick="dialog.showModal()">Open modal</button>
+<select id="select"><option>First</option><option>Second</option></select>
+<dialog id="dialog"><label>Modal input <input id="modalInput"></label><button id="close" onclick="dialog.close()">Close</button></dialog>
+<pre id="state"></pre>
+<script>
+window.events=[];
+for(let type of ['keydown','keyup','pointerdown','pointerup','focusin','focusout','input'])document.addEventListener(type,e=>{events.push({type,target:e.target.id,key:e.key,value:e.target.value});document.querySelector('#state').textContent=JSON.stringify(events.slice(-5),null,2)});
+</script>

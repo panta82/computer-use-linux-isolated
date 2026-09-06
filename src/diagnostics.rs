@@ -228,6 +228,13 @@ pub fn doctor_report() -> DoctorReport {
         capabilities.preferred.input = capabilities.input.first().cloned();
         capabilities.preferred.screenshot = capabilities.screenshot.first().cloned();
     }
+    if cfg!(feature = "mpx") {
+        capabilities.input = vec!["mpx-xi2-no-core-events-no-fallback".into()];
+        capabilities.screenshot = vec!["x11-read-only-no-raise".into()];
+        capabilities.isolation = vec!["Separate XI2 master pointer/keyboard on shared desktop; applications may still have shared focus state".into()];
+        capabilities.preferred.input = capabilities.input.first().cloned();
+        capabilities.preferred.screenshot = capabilities.screenshot.first().cloned();
+    }
     DoctorReport {
         platform,
         portals,

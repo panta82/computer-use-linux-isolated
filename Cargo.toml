@@ -23,6 +23,8 @@ path = "src/bin/computer-use-linux-cosmic.rs"
 [features]
 # PANTA: deployment build must never recover or inject input into the host session.
 isolated-x11 = []
+# PANTA: MPX inherits the no-uinput/no-portal/no-hydration safeguards.
+mpx = ["isolated-x11"]
 
 [dependencies]
 mimalloc = { version = "0.1", default-features = false }
