@@ -45,6 +45,8 @@ try:
     launch(['dbus-daemon', '--session', '--nofork', f'--address={env["DBUS_SESSION_BUS_ADDRESS"]}'])
     launch([str(BASE / 'runtime/usr/bin/Xvfb'), ':199', '-screen', '0', '1600x1000x24', '-auth', str(SESSION / 'Xauthority'), '-nolisten', 'tcp', '-noreset'])
     wait_for(['xdpyinfo'])
+    # PANTA: silence agent X11 bells without changing the main desktop's sound settings.
+    wait_for(['xset', 'b', 'off'])
     wait_for(['dbus-send', '--session', '--print-reply', '--dest=org.freedesktop.DBus', '/', 'org.freedesktop.DBus.ListNames'])
     launch([str(BASE / 'runtime/usr/bin/openbox'), '--config-file', str(BASE / 'openbox.xml')])
     wait_for([str(BASE / 'runtime/usr/bin/wmctrl'), '-m'])
@@ -59,7 +61,7 @@ try:
         password_file.chmod(0o600)
     launch([str(BASE / 'runtime/usr/bin/x11vnc'), '-display', ':199', '-auth', str(SESSION / 'Xauthority'),
             '-listen', '127.0.0.1', '-no6', '-rfbport', '5999', '-rfbauth', str(password_file),
-            '-forever', '-shared', '-noclipboard', '-noxdamage', '-quiet'])
+            '-forever', '-shared', '-nobell', '-noclipboard', '-noxdamage', '-quiet'])
     (SESSION / 'ready').write_text(str(os.getpid()))
     print('Isolated desktop ready on :199', flush=True)
     while all(c.poll() is None for c in children):
