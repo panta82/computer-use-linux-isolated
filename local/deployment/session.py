@@ -9,7 +9,8 @@ for name in ('ready', 'bus', 'Xauthority'):
     (SESSION / name).unlink(missing_ok=True)
 env = {key: os.environ[key] for key in ('HOME', 'USER', 'LOGNAME', 'LANG') if key in os.environ}
 env.update({
-    'PATH': f'{BASE}/runtime/usr/bin:/usr/bin:/bin',
+    # PANTA: retain installed user/system application commands in this desktop.
+    'PATH': f'{BASE}/runtime/usr/bin:{pathlib.Path.home()}/.local/bin:/usr/local/bin:' + os.environ.get('PATH', '/usr/bin:/bin'),
     'LD_LIBRARY_PATH': f'{BASE}/runtime/usr/lib/x86_64-linux-gnu',
     'DISPLAY': ':199', 'XAUTHORITY': str(SESSION / 'Xauthority'),
     'DBUS_SESSION_BUS_ADDRESS': f'unix:path={SESSION}/bus',
@@ -58,7 +59,7 @@ try:
         password_file.chmod(0o600)
     launch([str(BASE / 'runtime/usr/bin/x11vnc'), '-display', ':199', '-auth', str(SESSION / 'Xauthority'),
             '-listen', '127.0.0.1', '-no6', '-rfbport', '5999', '-rfbauth', str(password_file),
-            '-forever', '-shared', '-viewonly', '-noclipboard', '-noxdamage', '-quiet'])
+            '-forever', '-shared', '-noclipboard', '-noxdamage', '-quiet'])
     (SESSION / 'ready').write_text(str(os.getpid()))
     print('Isolated desktop ready on :199', flush=True)
     while all(c.poll() is None for c in children):

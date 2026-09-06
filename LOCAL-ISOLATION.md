@@ -11,7 +11,7 @@ New MCP connections use `/home/panta/.local/bin/computer-use-linux-isolated mcp`
 Reconnect existing clients after installation. Old shared-input MCP processes
 were stopped, and their cached executable path redirects to the isolated launcher.
 
-View the agent desktop, with input and clipboard sharing disabled:
+View and interact with the agent desktop. Clipboard sharing remains disabled:
 
 ```sh
 computer-use-linux-desktop view
@@ -30,11 +30,11 @@ existing browser instance:
 computer-use-linux-desktop run google-chrome --user-data-dir=/home/panta/.local/share/computer-use-linux/chrome-profile --disable-gpu
 ```
 
-App launches keep network access. Writable app storage is under
-`~/.local/share/computer-use-linux`; the rest of the filesystem is mounted read-only
-by the launcher. Configuration, cache and data use separate XDG directories.
-Apps may need a working directory or explicit output path within that writable
-location. Existing app logins and running sessions are not automatically reused.
+App launches keep network access and normal read/write access to the user's files,
+subject to normal Unix permissions. `/dev`, `/run`, and `/tmp` remain isolated to
+keep physical input and host session sockets out of the desktop. Configuration,
+cache and data use separate XDG directories. Existing app logins and running
+sessions are not automatically reused.
 The browser example is a launch recipe, not a verified browser compatibility test.
 
 ## Management
@@ -53,7 +53,7 @@ viewer exit restarts the complete session. Application processes/windows are los
 when the X server restarts; relaunch apps and reconnect MCP after that event.
 This does not promise restoration of unsaved application state.
 
-The read-only VNC server listens only on `127.0.0.1:5999`, uses a local password
+The interactive VNC server listens only on `127.0.0.1:5999`, uses a local password
 file with mode 0600, and has clipboard sharing disabled on the server. The view
 command opens a viewer only when explicitly invoked. No viewer was opened during
 installation.
@@ -126,6 +126,19 @@ existing desktop. Upstream: https://github.com/agent-sh/computer-use-linux
 Test scripts are in `local/deployment/`. Captured reports are in `local/*.log` and
 `local/*doctor.json` in this checkout, excluded from Git. Tests that stop or crash
 the service close agent desktop apps; use them only when its windows are disposable.
+
+## Follow-up: file access and interaction
+
+The user requested normal file access and interactive viewing after trying the
+initial setup. The launcher now mounts ordinary files read/write and enables
+viewer keyboard and pointer events. The VNC server no longer forces view-only mode.
+The application PATH includes user and system commands. Separate X11/DBus sessions,
+private input devices, and the patched server's no-fallback behavior are unchanged.
+A temporary file was successfully written/read/deleted inside `~/dev` from the
+app launcher; `/dev/uinput` remained absent. The service was restarted with the
+new configuration and its terminal reopened. Reopen the viewer using the view
+command, since an existing viewer may retain its old read-only options.
+Backups of the previous scripts are under `backup/*.before-full-files`.
 
 ## Updating
 
