@@ -12,8 +12,9 @@ env = json.loads((session / 'environment.json').read_text())
 mode = pathlib.Path(sys.argv[0]).name
 if mode == 'computer-use-linux-desktop':
     if sys.argv[1:] == ['view']:
+        # PANTA: VNC bell requests must not trigger the laptop's system beep.
         os.execvp('vncviewer', ['vncviewer', '-PasswordFile', str(base / 'view-password'),
-                  '-SendKeyEvents=1', '-SendPointerEvents=1', '127.0.0.1:99'])
+                  '-SendKeyEvents=1', '-SendPointerEvents=1', '-AcceptBell=0', '127.0.0.1:99'])
     if len(sys.argv) < 3 or sys.argv[1] != 'run':
         sys.exit('Usage: computer-use-linux-desktop view | run PROGRAM [ARGS...]')
     command = sys.argv[2:]

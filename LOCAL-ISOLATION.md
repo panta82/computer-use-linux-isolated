@@ -178,3 +178,11 @@ MCP clients afterward. Backups and isolated app data are retained at
 The full original Codex config backup is mode 0600 and may contain credentials;
 use the stanza-only `mcp-original.json` for manual restoration where possible.
 No AGENTS.md or existing desktop settings were changed.
+
+## Bell suppression
+
+The viewer launcher sets `AcceptBell=0`, and session startup uses `xset b off`
+and x11vnc `-nobell`. This suppresses agent-desktop bell requests without changing
+the main X11 display or PipeWire settings. Reopen an existing viewer using the
+launcher to apply its option. Server-side flags apply at the next normal session
+restart; the desktop was not restarted merely to apply this change.
