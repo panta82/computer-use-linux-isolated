@@ -41,3 +41,10 @@ __pycache__/
 
 # Agent docs
 .agent-docs
+
+# PANTA: local deployment dependencies and verification outputs are reproducible artifacts.
+/local/debs/
+/local/runtime/
+/local/*.log
+/local/*.json
+/local/deployment/__pycache__/

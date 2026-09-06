@@ -976,6 +976,9 @@ impl ComputerUseLinux {
     /// used by click/scroll/drag, independently of logical monitor scaling.
     /// Explicit backend overrides skip this device, including a cached one.
     async fn ensure_abs_pointer(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         if self.is_cosmic_wayland_session()
             || (native_x11_xdotool_pointer_session(
                 env::var("XDG_SESSION_TYPE").ok().as_deref(),
@@ -2862,6 +2865,9 @@ impl ComputerUseLinux {
 impl ServerHandler for ComputerUseLinux {}
 
 fn shell_execution_enabled() -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
     shell_execution_enabled_value(env::var(SHELL_ENABLE_ENV).ok().as_deref())
 }
 
@@ -4360,6 +4366,9 @@ impl ComputerUseLinux {
     // `COMPUTER_USE_LINUX_FORCE_YDOTOOL_*=1` always uses ydotool;
     // `COMPUTER_USE_LINUX_FORCE_PORTAL_*=1` always uses the portal.
     async fn should_prefer_portal_pointer_backend(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         if env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_POINTER") {
             return false;
         }
@@ -4380,6 +4389,9 @@ impl ComputerUseLinux {
     // Literal text needs a layout-aware route even when raw ydotool input is
     // available. KDE uses clipboard paste; compatible compositors use wtype.
     fn should_prefer_portal_text_backend(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         prefer_portal_text_backend(
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD"),
             self.should_prefer_xdotool_keyboard(),
@@ -4399,6 +4411,9 @@ impl ComputerUseLinux {
     /// keeps covering key chords; otherwise the portal is preferred only
     /// when ydotool is absent or the portal is forced.
     async fn should_prefer_portal_keyboard_for_chords(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return false;
+        }
         if env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD") {
             return false;
         }
@@ -4433,6 +4448,9 @@ impl ComputerUseLinux {
     /// `COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD=1` opts out;
     /// `COMPUTER_USE_LINUX_FORCE_XDOTOOL_KEYBOARD=1` forces it on.
     fn should_prefer_xdotool_keyboard(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return true;
+        }
         prefer_xdotool_keyboard(
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_KEYBOARD"),
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_XDOTOOL_KEYBOARD"),
@@ -4467,6 +4485,9 @@ impl ComputerUseLinux {
     }
 
     fn should_prefer_xdotool_pointer(&self) -> bool {
+        if cfg!(feature = "isolated-x11") {
+            return true;
+        }
         crate::diagnostics::hydrate_session_bus_env();
         prefer_xdotool_pointer(
             env_flag_enabled("COMPUTER_USE_LINUX_FORCE_YDOTOOL_POINTER"),
@@ -8681,6 +8702,9 @@ where
 }
 
 async fn run_ydotool(args: &[String]) -> std::result::Result<Output, String> {
+        if cfg!(feature = "isolated-x11") {
+            return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
+        }
     let support = ydotool::ensure_supported_async().await?;
     let socket = ydotool::socket_path_for_command()?;
     let mut command = TokioCommand::new(&support.executable);
@@ -8702,6 +8726,9 @@ async fn run_ydotool(args: &[String]) -> std::result::Result<Output, String> {
 }
 
 async fn run_ydotool_type_text(text: &str) -> std::result::Result<Output, String> {
+        if cfg!(feature = "isolated-x11") {
+            return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
+        }
     validate_ydotool_text(text)?;
     let support = ydotool::ensure_supported_async().await?;
     let socket = ydotool::socket_path_for_command()?;

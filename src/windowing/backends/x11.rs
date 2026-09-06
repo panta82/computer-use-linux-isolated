@@ -53,7 +53,9 @@ pub fn probe() -> BackendProbe {
             // focused_window() and activate_window's focus verification) comes
             // from `_NET_ACTIVE_WINDOW` read via xprop. Without xprop we can list
             // but cannot verify focus, so don't advertise focus capabilities.
-            let can_focus = can_exact_focus() && active_window_query().is_some();
+            let can_focus = can_exact_focus()
+                && (output.stdout.iter().all(u8::is_ascii_whitespace)
+                    || active_window_query().is_some());
             BackendProbe {
                 id: X11_BACKEND,
                 ok: true,
@@ -63,7 +65,7 @@ pub fn probe() -> BackendProbe {
                 detail: if can_focus {
                     "wmctrl listed X11/EWMH windows".to_string()
                 } else {
-                    "wmctrl listed X11/EWMH windows; xprop missing, so focused-window verification is unavailable".to_string()
+                    "wmctrl listed X11/EWMH windows, but xprop or its active-window query is unavailable".to_string()
                 },
             }
         }

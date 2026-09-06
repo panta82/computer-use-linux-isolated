@@ -39,6 +39,14 @@ pub struct SetupCommandReport {
 }
 
 pub async fn setup_window_targeting_report() -> WindowTargetingSetupReport {
+    if cfg!(feature = "isolated-x11") {
+        return WindowTargetingSetupReport {
+            extension_dir: String::new(), wrote_files: false,
+            enable_command: SetupCommandReport { ok: false, detail: "GNOME extension setup is forbidden in isolated X11 mode".into() },
+            windows: Vec::new(), windows_error: None, permissions_hint: None, requires_shell_reload: false,
+            message: "Dedicated X11 desktop already uses EWMH window targeting; no host extension changes permitted".into(),
+        };
+    }
     hydrate_session_bus_env();
 
     let user_dir = extension_dir();

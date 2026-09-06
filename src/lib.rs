@@ -16,6 +16,7 @@ pub mod indicator;
 mod keyboard_keymap;
 mod pixelflux;
 mod pointer_path;
+mod isolation;
 mod remote_desktop;
 #[path = "screenshot.rs"]
 mod screenshot_impl;
