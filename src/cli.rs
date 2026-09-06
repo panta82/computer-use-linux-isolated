@@ -2,6 +2,9 @@ use crate::{abs_pointer, atspi_tree, diagnostics, gnome_extension, screenshot, s
 use anyhow::{Context, Result};
 
 pub(crate) async fn run_from_env() -> Result<()> {
+    if crate::desktop::dispatch()? {
+        return Ok(());
+    }
     if cfg!(feature = "isolated-x11") {
         crate::isolation::validate_environment()?;
     }

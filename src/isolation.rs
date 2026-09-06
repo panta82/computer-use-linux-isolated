@@ -4,7 +4,7 @@ use anyhow::{ensure, Result};
 pub(crate) fn validate_environment() -> Result<()> {
     let runtime = std::env::var("COMPUTER_USE_LINUX_SESSION_DIR")?;
     ensure!(
-        runtime.starts_with('/') && runtime.ends_with("/computer-use-linux/session"),
+        runtime.starts_with('/') && runtime.ends_with("/computer-use-linux-isolated/session"),
         "Invalid isolated session directory"
     );
     for (key, expected) in [

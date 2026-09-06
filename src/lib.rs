@@ -1,3 +1,5 @@
+#[cfg(not(feature = "isolated-x11"))]
+compile_error!("This fork requires isolated-x11; shared desktop builds are forbidden");
 mod abs_pointer;
 mod accessibility_guard;
 #[path = "atspi_tree.rs"]
@@ -6,6 +8,7 @@ mod cli;
 mod command_runner;
 mod cosmic_helper;
 mod diagnostics_cache;
+mod desktop;
 #[path = "diagnostics.rs"]
 mod diagnostics_impl;
 mod ei_input;

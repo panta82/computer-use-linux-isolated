@@ -377,7 +377,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "computer-use-linux"
+name = "computer-use-linux-isolated"
 version = "0.7.35"
 dependencies = [
  "anyhow",

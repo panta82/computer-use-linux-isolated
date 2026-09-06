@@ -2854,7 +2854,7 @@ impl ComputerUseLinux {
 
 #[tool_handler(
     router = self.mcp_tool_router(),
-    name = "computer-use-linux",
+    name = "computer-use-linux-isolated",
     // NOTE: keep in lockstep with Cargo.toml + package.json on every release.
     // The rmcp tool_handler macro only accepts a string literal here, so this
     // can't be env!("CARGO_PKG_VERSION"); the MCP safety check (CI) fails the

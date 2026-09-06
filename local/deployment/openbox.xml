@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- PANTA: dedicated agent desktop config; no host focus or desktop settings changed. -->
-<openbox_config xmlns="http://openbox.org/3.4/rc">
-  <focus><focusNew>yes</focusNew><followMouse>no</followMouse></focus>
-  <theme><name>Clearlooks</name></theme>
-  <desktops><number>1</number><firstdesk>1</firstdesk></desktops>
-</openbox_config>

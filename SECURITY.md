@@ -1,15 +1,5 @@
-# Security Policy
+# Scope of isolation
 
-## Reporting Vulnerabilities
+This project separates normal model GUI input from the user's primary desktop. It runs under the same Unix account with access to the user's files. It does not contain malicious same-user code or prevent arbitrary launched applications from discovering other same-user processes. Do not use it as an untrusted-code sandbox.
 
-Do not open public issues for security vulnerabilities.
-
-Use GitHub private vulnerability reporting on this repository, or contact the maintainer directly through GitHub.
-
-## Supported Versions
-
-Only the latest released version is supported with security updates.
-
-## Scope
-
-`computer-use-linux` can observe and mutate the local Linux desktop through MCP, AT-SPI, portals, compositor APIs, and `ydotoold`. Security reports about unintended desktop access, tool annotation drift, unsafe defaults, packaging integrity, or release asset verification are in scope.
+Report problems through the fork's GitHub issues without including credentials, browser profiles, authentication files, or personal desktop screenshots. Never solve a startup failure by enabling host input, weakening AppArmor globally, or changing DISPLAY to the primary session.
