@@ -56,7 +56,7 @@ os.execv(exe,[exe,'--user-data-dir='+str(base/'chrome-profile'),'--no-first-run'
     mime=BASE/'config/mimeapps.list'
     if not mime.exists(): mime.write_text('# PANTA: browser links use the separate persistent profile.\n[Default Applications]\nx-scheme-handler/http=google-chrome.desktop\nx-scheme-handler/https=google-chrome.desktop\ntext/html=google-chrome.desktop\n')
     entries=pathlib.Path.home()/'.local/share/applications';entries.mkdir(parents=True,exist_ok=True)
-    (entries/(NAME+'.desktop')).write_text('[Desktop Entry]\nType=Application\nName=Isolated desktop\nExec="'+str(EXE)+'" desktop view\nIcon=computer\nCategories=Utility;\n')
+    (entries/(NAME+'.desktop')).write_text('# PANTA: application-menu launcher for the isolated desktop viewer.\n[Desktop Entry]\nType=Application\nName=Isolated computer use environment\nExec="'+str(EXE)+'" desktop view\nIcon=computer\nTerminal=false\nCategories=Utility;\n')
     systemctl('daemon-reload',check=True)
     systemctl('enable',UNIT,check=True)
     print('Installed. Run '+NAME+' desktop start, then desktop view.\nMCP command: '+str(EXE)+'\nMCP args: ["mcp"]')
