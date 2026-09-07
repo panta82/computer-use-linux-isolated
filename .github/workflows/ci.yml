@@ -16,6 +16,7 @@ jobs:
       - run: cargo build --locked --bin computer-use-linux-isolated
       - run: target/debug/computer-use-linux-isolated --help
       - run: python3 -m py_compile desktop/*.py
+      - run: python3 scripts/test-desktop-manager.py
       - run: bash -n install.sh
       - name: Shared-input builds must be rejected
         run: |

@@ -16,7 +16,18 @@ EXE = pathlib.Path(sys.argv[1]).resolve()
 ARGS = sys.argv[2:]
 
 def systemctl(*args, **kwargs):
-    return subprocess.run(['systemctl', '--user', *args], **kwargs)
+    # PANTA: MCP hosts may omit session variables or inherit the private desktop bus.
+    # Only service management uses the user's systemd bus; never export it to apps/MCP.
+    runtime = pathlib.Path('/run/user') / str(os.getuid())
+    bus = runtime / 'bus'
+    if not runtime.is_dir() or runtime.stat().st_uid != os.getuid() or not bus.is_socket():
+        raise RuntimeError(f'User service manager unavailable at {bus}; log in first')
+    control_env = dict(os.environ)
+    control_env.update({
+        'XDG_RUNTIME_DIR': str(runtime),
+        'DBUS_SESSION_BUS_ADDRESS': f'unix:path={bus}',
+    })
+    return subprocess.run(['systemctl', '--user', *args], env=control_env, **kwargs)
 
 def install():
     required = ['bwrap', 'Xvfb', 'xauth', 'xdpyinfo', 'xset', 'xsetroot', 'dbus-daemon',
@@ -40,7 +51,8 @@ def install():
     chrome='''#!/usr/bin/python3
 import os,pathlib,sys
 base=pathlib.Path.home()/'.local/share/computer-use-linux-isolated'
-if os.environ.get('DISPLAY') != ':199' or os.environ.get('XAUTHORITY') != str(base/'session/Xauthority'):
+# PANTA: XFCE may specify screen zero explicitly; both forms address only our private X server.
+if os.environ.get('DISPLAY') not in (':199', ':199.0') or os.environ.get('XAUTHORITY') != str(base/'session/Xauthority'):
     sys.exit('Chrome launcher requires the isolated session')
 if any(a.startswith(('--user-data-dir','--profile-directory')) for a in sys.argv[1:]):
     sys.exit('Browser profile overrides are forbidden')

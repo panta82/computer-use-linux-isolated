@@ -43,7 +43,9 @@ sudo apt-get update
 ~/.local/bin/computer-use-linux-isolated desktop view
 ```
 
-Review `install.sh` before running it. Only `--dependencies` uses sudo, for native packages. The build uses Cargo.lock. The normal install writes one executable to `~/.local/bin`, desktop resources and profiles to `~/.local/share/computer-use-linux-isolated`, a user service, and an application menu entry. It does not edit your MCP configuration, install a skill automatically, alter the main desktop, or copy browser data. Include `~/.local/bin` in PATH if you want to omit the absolute path.
+Review `install.sh` before running it. Only `--dependencies` uses sudo, for native packages. The build uses Cargo.lock. The normal install writes one executable to `~/.local/bin`, desktop resources and profiles to `~/.local/share/computer-use-linux-isolated`, a user service, and an application menu entry. After installing the application, it offers to install the skill for your agents. It does not edit your MCP configuration, alter the main desktop, or copy browser data. Include `~/.local/bin` in PATH if you want to omit the absolute path.
+
+On repeat interactive installs, if `target/release/computer-use-linux-isolated` already exists and is executable, the installer asks `Rebuild before installing? [y/N]`. Press Enter to reuse it, or answer `y` to include source changes. Reusing a binary also reuses its embedded desktop manager; changes to the skill itself can still be installed without rebuilding. Use `./install.sh --rebuild` to run Cargo without the rebuild prompt, optionally combined with `--skip-skill`. Fresh installs and noninteractive runs always run Cargo's normal incremental build. This prompt does not interrupt a build already in progress.
 
 XFCE supplies the Applications menu, taskbar, app finder, terminal, file manager, and normal window controls. These are standard packaged components, not a custom desktop UI. We supervise the components directly instead of launching another login manager or importing the host session environment.
 
@@ -68,7 +70,17 @@ Use your absolute executable path and `mcp` argument. Generic MCP JSON:
 
 Disable any old `computer-use-linux` MCP entry so models do not accidentally select the upstream server. Do not install `@agent-sh/computer-use-linux` as a substitute: that package is upstream and can control the main session. This fork currently distributes through source installation, not npm or crates.io.
 
-Install or reference [the included model skill](skills/computer-use-linux-isolated/SKILL.md) using your host's skill mechanism. Models must check `doctor`, observe windows and modal dialogs before input, stop on isolation errors, and coordinate with the human viewer. Input actions are serialized by the MCP server, but there is no whole-task ownership lock or automatic human takeover detection.
+The installer asks `Install the skill for your agents? [Y/n]`. Accept to run the [skills CLI](https://github.com/vercel-labs/skills) against this local checkout, then select your harnesses and the recommended Symlink installation method. Node.js/npm with `npx` is required only for this optional step. The CLI may download its own npm package, but the skill comes from the checkout rather than another GitHub download.
+
+Use `./install.sh --skip-skill` to install or update only the application. Without an interactive terminal, the installer skips the skill step and prints the separate command. To install or refresh [the included model skill](skills/computer-use-linux-isolated/SKILL.md) later without rebuilding the application, run from the repository:
+
+```bash
+npx skills add . --skill computer-use-linux-isolated --global
+```
+
+Global installation applies to your user across projects. The CLI manages the shared installed skill and harness symlinks; these are not live links into this checkout. Run the command again after changing the skill. MCP server configuration remains a separate step in each harness. If you accept skill installation but `npx` is missing or the CLI fails, `install.sh` exits unsuccessfully and prints a retry command; the application remains installed.
+
+You can also install the skill through your host's own skill mechanism. Models must check `doctor`, observe windows and modal dialogs before input, stop on isolation errors, and coordinate with the human viewer. Input actions are serialized by the MCP server, but there is no whole-task ownership lock or automatic human takeover detection.
 
 ## Commands
 
