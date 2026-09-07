@@ -1,12 +1,32 @@
 # computer-use-linux-isolated
 
-MCP computer use in a persistent, separate Linux desktop. A fork of [agent-sh/computer-use-linux](https://github.com/agent-sh/computer-use-linux), maintained on `main`. The original authors retain attribution under the MIT license.
+A fork of [agent-sh/computer-use-linux](https://github.com/agent-sh/computer-use-linux). The original authors retain attribution under the MIT license.
+
+## Explanation
+
+This is basically a spinoff of the linux computer use skill, where instead of messing with your own desktop, it uses a separate X11 desktop session on a virtual display.
 
 Models operate an Xvfb display with its own cursor, keyboard focus, D-Bus session, and XFCE desktop components. You can watch and interact through a local VNC viewer. Your files and installed applications remain available under your normal Linux account.
 
-There is no MPX/second-cursor support on the primary desktop. There is no fallback to your primary input session. This is input separation, not a security boundary against programs running as your user.
+**What's included:**
+- XFCE lightweight desktop, so you can do things in the agent session
+- A skill, so you can tell your clanker to go use the desktop and it'll know what to do
+- VNC viewer, so you can connect to it and watch what the little guy is doing
 
-## Install on another computer
+**Advantages over VM:**
+- Trivially shared file system and installed apps (it's the same computer)
+- Lower resource use (no need to allocate RAM etc.)
+
+**Disadvantages over VM:**
+- It's the same OS, the clanker can still (probably) interfere with you
+
+**Advantages over a shared session:**
+- Clanker no longer steals your focus or mouse
+
+**Disadvantages over a shared session:**
+- You have to log into stuff anew (but it's persistent once you do)
+
+## Installation
 
 Initial target: Ubuntu with systemd user services, an X11-capable package stack, and working unprivileged bubblewrap. Runtime tested in a clean Ubuntu 25.10 x86_64 VM. Other distributions and architectures are not yet validated. Ubuntu package repositories and security policy must permit the listed packages and bubblewrap user namespaces; the installer does not disable AppArmor or change kernel policy.
 
