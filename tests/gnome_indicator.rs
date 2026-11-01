@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// These fixtures exercise shared-desktop routes absent from this fork.
+#![cfg(not(feature = "isolated-x11"))]
 
 #[test]
 fn gnome_indicator_capture_regressions() {

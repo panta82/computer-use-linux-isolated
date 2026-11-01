@@ -7,8 +7,8 @@ mod atspi_tree_impl;
 mod cli;
 mod command_runner;
 mod cosmic_helper;
-mod diagnostics_cache;
 mod desktop;
+mod diagnostics_cache;
 #[path = "diagnostics.rs"]
 mod diagnostics_impl;
 mod ei_input;
@@ -16,10 +16,10 @@ mod gnome_extension;
 mod hyprland_input;
 mod identity;
 pub mod indicator;
+mod isolation;
 mod keyboard_keymap;
 mod pixelflux;
 mod pointer_path;
-mod isolation;
 mod remote_desktop;
 #[path = "screenshot.rs"]
 mod screenshot_impl;

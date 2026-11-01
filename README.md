@@ -106,6 +106,10 @@ MCP runs inside bubblewrap with private `/dev`, `/run`, `/tmp`, and networking, 
 
 ## Update, diagnose, and remove
 
+The current fork is rebased onto upstream `computer-use-linux` 0.7.35 at `3175c045a68011235bcefb8b60305204c7a14729`. It retains the fixed persistent XFCE desktop, private app settings, separate Chrome profile, VNC viewer and mandatory input isolation. The upstream X11 pointer, text, screenshot and accessibility fixes are included. Pixelflux remote input and the activity overlay are disabled in this fork. Upstream plugins that install the shared-desktop binary are not distributed here.
+
+The X server ownership check and real keyboard-focus verification adapt fixes from [Agent Workspace #150](https://github.com/agent-sh/agent-workspace-linux/pull/150) and [#137](https://github.com/agent-sh/agent-workspace-linux/pull/137). A foreign process holding `:199` still causes failure; the fork never moves to another display or attaches to the foreign server.
+
 ```bash
 git pull --ff-only
 ./install.sh
@@ -126,6 +130,26 @@ Uninstall removes the service and menu entry, preserving all profiles/settings/f
 
 See [validation details](docs/validation.md) for the tested environment and remaining gaps.
 
+### Optional XFCE Trash fix on Ubuntu 24.04
+
+Ubuntu 24.04's `xfdesktop` 4.18.1 can flood the journal when counting trashed files. [XFCE's fix](https://gitlab.xfce.org/xfce/xfdesktop/-/merge_requests/208) requests the missing `standard::name` file attribute. The backport in `patches/xfdesktop-trash-name.patch` keeps the Trash icon and its behavior. It does not empty the Trash or hide warnings.
+
+Build a private replacement against Ubuntu 24.04's libraries, without installing development packages on your host:
+
+```bash
+mkdir -p target/xfdesktop
+docker build -t computer-use-linux-isolated-xfdesktop-build:24.04 -f scripts/xfdesktop-backport.Dockerfile scripts
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD:/source:ro" -v "$PWD/target/xfdesktop:/output" \
+  computer-use-linux-isolated-xfdesktop-build:24.04 \
+  /source/scripts/build-xfdesktop.sh --output /output
+./install.sh --rebuild --skip-skill --xfce-trash-fix
+```
+
+Alternatively, install the development packages listed in the Dockerfile and run `scripts/build-xfdesktop.sh` natively. The script checks the source archive's SHA-256 and applies the upstream patch without fuzz. The installer requires the system `xfdesktop` to be 4.18.1 and installs only the replacement executable under `~/.local/share/computer-use-linux-isolated/runtime/bin/xfdesktop`. System packages and your main desktop are unchanged. Save any isolated desktop work before stopping and starting the service to load the replacement.
+
+The private executable remains selected until removed. After upgrading the system package to a version containing the fix, remove this private executable and restart the isolated desktop to use the system version again. XFCE released the fix in 4.20.2; a distro may also backport it to an older version.
+
 ## Development
 
 ```bash
@@ -133,6 +157,8 @@ cargo fmt --all -- --check
 cargo test --locked --lib
 cargo build --locked --bin computer-use-linux-isolated
 python3 -m py_compile desktop/*.py
+python3 scripts/test-desktop-manager.py
+python3 scripts/test-session-startup.py
 ```
 
 `desktop/manage.py` and `desktop/session.py` are embedded into the Rust binary at build time. Python 3 is a runtime dependency. Changes to those files require rebuilding the executable. A build with `--no-default-features` fails deliberately; it cannot turn this fork into a shared-input server.

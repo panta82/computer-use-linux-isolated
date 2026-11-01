@@ -5,6 +5,17 @@ use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf, process::Command};
 fn session_discovery_is_reused_and_environment_changes_refresh_it() {
     if std::env::var_os("CUL_HYDRATION_TEST_CHILD").is_some() {
         let log = PathBuf::from(std::env::var_os("CUL_HYDRATION_TEST_LOG").unwrap());
+        if cfg!(feature = "isolated-x11") {
+            let before: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
+            hydrate_session_bus_env();
+            assert_eq!(before, std::env::vars_os().collect());
+            assert!(
+                !log.exists(),
+                "isolated builds must never discover the host session"
+            );
+            return;
+        }
+
         for _ in 0..3 {
             hydrate_session_bus_env();
         }

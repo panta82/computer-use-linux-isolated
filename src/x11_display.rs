@@ -340,6 +340,26 @@ pub(crate) struct FrameExtents {
 }
 
 impl X11Display {
+    /// Resolve real keyboard focus to a listed client, including its input children.
+    /// Adapted from agent-workspace-linux #137; EWMH active-window metadata can be stale.
+    pub(crate) fn focused_client(&self, clients: &[Window]) -> Result<Option<Window>> {
+        let mut window = self.conn.get_input_focus()?.reply()?.focus;
+        for _ in 0..64 {
+            if window <= 1 || window == self.root {
+                return Ok(None);
+            }
+            if clients.contains(&window) {
+                return Ok(Some(window));
+            }
+            let parent = self.conn.query_tree(window)?.reply()?.parent;
+            if parent == window {
+                return Ok(None);
+            }
+            window = parent;
+        }
+        bail!("X11 focus ancestry exceeds 64 windows")
+    }
+
     fn keyboard_mapping(&self) -> Result<(u8, Vec<u32>)> {
         let setup = self.conn.setup();
         let count = setup.max_keycode - setup.min_keycode + 1;

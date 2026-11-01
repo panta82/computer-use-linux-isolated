@@ -34,7 +34,9 @@ const GEOMETRY_VERIFY_DELAY: Duration = Duration::from_millis(50);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub(crate) fn can_exact_focus() -> bool {
-    is_x11_session() && command_on_path("wmctrl") && command_on_path("xprop")
+    is_x11_session()
+        && command_on_path("wmctrl")
+        && (cfg!(feature = "isolated-x11") || command_on_path("xprop"))
 }
 
 pub fn probe() -> BackendProbe {
@@ -49,12 +51,11 @@ pub fn probe() -> BackendProbe {
         PROBE_TIMEOUT,
     ) {
         Ok(output) if output.status.success() => {
-            // Listing only needs wmctrl, but the `focused` flag (and therefore
-            // focused_window() and activate_window's focus verification) comes
-            // from `_NET_ACTIVE_WINDOW` read via xprop. Without xprop we can list
-            // but cannot verify focus, so don't advertise focus capabilities.
+            // Native focus works even when EWMH metadata is missing or stale.
+            // Shared-desktop builds still require xprop for focus verification.
             let can_focus = can_exact_focus()
-                && (output.stdout.iter().all(u8::is_ascii_whitespace)
+                && (cfg!(feature = "isolated-x11")
+                    || output.stdout.iter().all(u8::is_ascii_whitespace)
                     || active_window_query().is_some());
             BackendProbe {
                 id: X11_BACKEND,
@@ -113,9 +114,28 @@ async fn list_windows_with_focus_query(require_focus_query: bool) -> Result<Vec<
         );
     }
 
-    let active_id =
-        resolve_active_window_query(active_window_query_async().await, require_focus_query)?;
+    let active_id = if cfg!(feature = "isolated-x11") {
+        None
+    } else {
+        resolve_active_window_query(active_window_query_async().await, require_focus_query)?
+    };
     let mut windows = parse_wmctrl_windows(&String::from_utf8_lossy(&output.stdout), active_id);
+    if cfg!(feature = "isolated-x11") {
+        let clients = windows.iter().map(x11_window_id).collect::<Vec<_>>();
+        let focus = with_x11_display(X11_QUERY_TIMEOUT, move |display| {
+            display.focused_client(&clients)
+        })
+        .await
+        .and_then(|result| result);
+        let focused = match focus {
+            Ok(window) => window,
+            Err(error) if require_focus_query => return Err(error),
+            Err(_) => None,
+        };
+        for window in &mut windows {
+            window.focused = focused == Some(x11_window_id(window));
+        }
+    }
     correct_client_origins(&mut windows).await;
     enrich_terminal_windows(&mut windows);
     Ok(windows)
@@ -151,6 +171,18 @@ pub(crate) fn apply_client_origins(windows: &mut [WindowInfo], origins: &[Option
 }
 
 pub async fn activate_window(window_id: u64) -> Result<()> {
+    if cfg!(feature = "isolated-x11") {
+        let target = u32::try_from(window_id)?;
+        if with_x11_display(X11_QUERY_TIMEOUT, move |display| {
+            display.focused_client(&[target])
+        })
+        .await??
+            == Some(target)
+        {
+            // Preserve a focused popup or input child instead of reactivating its parent.
+            return Ok(());
+        }
+    }
     let id = window_id_arg(window_id);
     run_wmctrl(&["-i", "-a", id.as_str()], "activate window", window_id).await
 }

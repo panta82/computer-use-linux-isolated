@@ -28,6 +28,10 @@ impl PixelfluxConfig {
     /// `PIXELFLUX_CU` plus `PIXELFLUX_CU_TOKEN`. A non-loopback address is
     /// ignored so this client cannot be pointed at another host.
     pub(crate) fn from_env() -> Option<Self> {
+        // This fork may only control its managed X11 display, never an HTTP input service.
+        if cfg!(feature = "isolated-x11") {
+            return None;
+        }
         let raw = std::env::var("PIXELFLUX_CU")
             .ok()
             .filter(|value| !value.is_empty())?;
@@ -603,6 +607,18 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "isolated-x11")]
+    fn isolated_build_ignores_remote_input_configuration() {
+        let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _env = EnvReset::apply(&[
+            ("PIXELFLUX_CU", Some("8080")),
+            ("PIXELFLUX_CU_TOKEN", Some("test-token")),
+        ]);
+        assert!(PixelfluxConfig::from_env().is_none());
+    }
+
+    #[test]
+    #[cfg(not(feature = "isolated-x11"))]
     fn from_env_requires_port_and_token() {
         let _guard = TEST_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         for (port, token) in [

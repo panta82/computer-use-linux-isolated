@@ -1,10 +1,27 @@
 #!/usr/bin/python3
 # PANTA: supervise a private X11/DBus desktop; never inherit host session endpoints.
-import os, pathlib, secrets, signal, socket, subprocess, time
+import os, pathlib, secrets, signal, socket, stat, subprocess, time
+
+def private_directory(path):
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+        raise RuntimeError(f'Unsafe isolated runtime directory: {path}')
+    path.chmod(0o700)
+
+def verify_display_owner(pid, lock=pathlib.Path('/tmp/.X199-lock')):
+    # Adapted from agent-workspace-linux #150: a responding X server alone is not proof of ownership.
+    try:
+        owner = int(lock.read_text().strip())
+    except (OSError, ValueError) as error:
+        raise RuntimeError('Cannot verify the isolated X server lock') from error
+    if owner != pid:
+        raise RuntimeError('Display :199 belongs to another X server; refusing to attach')
+
 BASE = pathlib.Path.home() / '.local/share/computer-use-linux-isolated'
 SESSION = BASE / 'session'
-SESSION.mkdir(parents=True, exist_ok=True, mode=0o700)
-os.chmod(SESSION, 0o700)
+private_directory(BASE)
+private_directory(SESSION)
 if pathlib.Path('/tmp/.X199-lock').exists() or pathlib.Path('/tmp/.X11-unix/X199').exists():
     raise SystemExit('Display :199 is already occupied; refusing to attach or fall back')
 with socket.socket() as listener_check:
@@ -35,7 +52,7 @@ def wait_for(args):
     for _ in range(100):
         if any(c.poll() is not None for c in children):
             raise RuntimeError('isolated desktop component exited')
-        if subprocess.run(args, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        if subprocess.run(args, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode == 0:
             return
         time.sleep(.1)
     raise RuntimeError(f'isolated desktop failed readiness: {args}')
@@ -47,21 +64,25 @@ try:
     (SESSION / 'Xauthority').touch(mode=0o600)
     subprocess.run(['xauth', '-f', str(SESSION / 'Xauthority'), 'add', ':199', '.', secrets.token_hex(16)], env=env, check=True)
     launch(['dbus-daemon', '--session', '--nofork', f'--address={env["DBUS_SESSION_BUS_ADDRESS"]}'])
-    launch(['Xvfb', ':199', '-screen', '0', '1600x1000x24', '-auth', str(SESSION / 'Xauthority'), '-nolisten', 'tcp', '-noreset'])
+    xserver = launch(['Xvfb', ':199', '-screen', '0', '1600x1000x24', '-auth', str(SESSION / 'Xauthority'), '-nolisten', 'tcp', '-noreset'])
     wait_for(['xdpyinfo'])
+    verify_display_owner(xserver.pid)
     # PANTA: silence agent X11 bells without changing the main desktop's sound settings.
     wait_for(['xset', 'b', 'off'])
     wait_for(['dbus-send', '--session', '--print-reply', '--dest=org.freedesktop.DBus', '/', 'org.freedesktop.DBus.ListNames'])
     launch(['xfsettingsd', '--no-daemon'])
     launch(['xfwm4', '--compositor=off'])
     launch(['xfce4-panel'])
-    launch(['xfdesktop'])
+    # The optional backport keeps the Trash icon while fixing older distro xfdesktop builds.
+    patched_desktop = BASE / 'runtime/bin/xfdesktop'
+    launch([str(patched_desktop) if patched_desktop.is_file() else 'xfdesktop'])
     wait_for(['wmctrl', '-m'])
     # Private bus activation does not contact the user's systemd desktop bus.
     wait_for(['gdbus', 'call', '--session', '--dest', 'org.a11y.Bus', '--object-path', '/org/a11y/bus', '--method', 'org.a11y.Bus.GetAddress'])
     wait_for(['busctl', '--user', 'set-property', 'org.a11y.Bus', '/org/a11y/bus', 'org.a11y.Status', 'IsEnabled', 'b', 'true'])
     import json
-    (SESSION / 'environment.json').write_text(json.dumps(env))
+    (SESSION / 'environment.json.new').write_text(json.dumps(env))
+    (SESSION / 'environment.json.new').replace(SESSION / 'environment.json')
     password_file = BASE / 'view-password'
     if not password_file.exists():
         subprocess.run(['x11vnc', '-storepasswd', secrets.token_urlsafe(6), str(password_file)], env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

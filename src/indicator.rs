@@ -278,7 +278,7 @@ pub(crate) struct Indicator {
 impl Default for Indicator {
     fn default() -> Self {
         // Unit tests build servers freely; they must not touch a real overlay.
-        let live = !cfg!(test);
+        let live = !cfg!(test) && !cfg!(feature = "isolated-x11");
         let socket = live
             .then(client_socket)
             .flatten()

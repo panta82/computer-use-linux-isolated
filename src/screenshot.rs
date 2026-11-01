@@ -334,7 +334,7 @@ impl ScreenshotBackend {
 
 pub async fn capture_screenshot_raw() -> Result<RawScreenshotCapture> {
     if cfg!(feature = "isolated-x11") {
-        return capture_with_x11_import().await;
+        return capture_isolated_x11().await;
     }
     hydrate_session_bus_env();
 
@@ -1201,6 +1201,7 @@ mod tests {
 
     #[tokio::test]
     #[allow(clippy::await_holding_lock)] // current-thread test: other env tests wait on the lock.
+    #[cfg(not(feature = "isolated-x11"))]
     async fn screenshot_prefers_pixelflux_when_configured() {
         let _guard = crate::pixelflux::TEST_ENV_LOCK
             .lock()
@@ -1592,27 +1593,9 @@ mod tests {
     }
 }
 
-// PANTA: use only this X connection, never host portals or screenshot services.
-async fn capture_with_x11_import() -> Result<RawScreenshotCapture> {
-    let mut command = Command::new("import");
-    command.args(["-window", "root", "png:-"]);
-    let output = crate::command_runner::output_with_timeout(
-        command,
-        "isolated X11 screenshot",
-        std::time::Duration::from_secs(10),
-    )
-    .await?;
-    anyhow::ensure!(
-        output.status.success(),
-        "isolated X11 screenshot failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let (width, height) = png_dimensions(&output.stdout)?;
-    Ok(RawScreenshotCapture {
-        mime_type: "image/png".into(),
-        bytes: output.stdout,
-        source: "isolated-x11".into(),
-        width,
-        height,
-    })
+// Use upstream's bounded native X11 capture, without portal or CLI fallbacks.
+async fn capture_isolated_x11() -> Result<RawScreenshotCapture> {
+    let mut capture = capture_with_x11().await?;
+    capture.source = "isolated-x11".into();
+    Ok(capture)
 }

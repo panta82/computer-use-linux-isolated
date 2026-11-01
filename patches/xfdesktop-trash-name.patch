@@ -1,0 +1,19 @@
+From: correctmost <11866-correctmost@users.noreply.gitlab.xfce.org>
+Subject: Fix criticals in g_file_info_get_name with trashed files
+Upstream: https://gitlab.xfce.org/xfce/xfdesktop/-/merge_requests/208
+Commit: 03f8af7daf70bf08dbcbc5c04ebe63fad616fb76
+
+Backport to xfdesktop 4.18.1. GFileEnumerator requires standard::name when
+iterating the trash entries. Keep the Trash icon and its normal behavior.
+
+--- a/src/xfdesktop-special-file-icon.c
++++ b/src/xfdesktop-special-file-icon.c
+@@ -644,7 +644,7 @@
+      * drive that isn't mounted.
+      */
+     enumerator = g_file_enumerate_children(special_file_icon->priv->file,
+-                                           G_FILE_ATTRIBUTE_ACCESS_CAN_DELETE,
++                                           G_FILE_ATTRIBUTE_ACCESS_CAN_DELETE "," G_FILE_ATTRIBUTE_STANDARD_NAME,
+                                            G_FILE_QUERY_INFO_NONE,
+                                            NULL,
+                                            NULL);

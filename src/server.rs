@@ -2865,9 +2865,9 @@ impl ComputerUseLinux {
 impl ServerHandler for ComputerUseLinux {}
 
 fn shell_execution_enabled() -> bool {
-        if cfg!(feature = "isolated-x11") {
-            return false;
-        }
+    if cfg!(feature = "isolated-x11") {
+        return false;
+    }
     shell_execution_enabled_value(env::var(SHELL_ENABLE_ENV).ok().as_deref())
 }
 
@@ -8702,9 +8702,9 @@ where
 }
 
 async fn run_ydotool(args: &[String]) -> std::result::Result<Output, String> {
-        if cfg!(feature = "isolated-x11") {
-            return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
-        }
+    if cfg!(feature = "isolated-x11") {
+        return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
+    }
     let support = ydotool::ensure_supported_async().await?;
     let socket = ydotool::socket_path_for_command()?;
     let mut command = TokioCommand::new(&support.executable);
@@ -8726,9 +8726,9 @@ async fn run_ydotool(args: &[String]) -> std::result::Result<Output, String> {
 }
 
 async fn run_ydotool_type_text(text: &str) -> std::result::Result<Output, String> {
-        if cfg!(feature = "isolated-x11") {
-            return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
-        }
+    if cfg!(feature = "isolated-x11") {
+        return Err("Shared ydotool input forbidden in isolated X11 build; no fallback".into());
+    }
     validate_ydotool_text(text)?;
     let support = ydotool::ensure_supported_async().await?;
     let socket = ydotool::socket_path_for_command()?;
@@ -9856,6 +9856,10 @@ printf '%s %s\n' "${0##*/}" "$*" >> "$CUL_POINTER_TEST_LOG"
             "wayland-portal",
             "x11",
         ] {
+            if cfg!(feature = "isolated-x11") && mode != "x11" {
+                continue;
+            }
+
             let log = dir.join(format!("{mode}.log"));
             let capture_log = dir.join(format!("{mode}-capture.log"));
             let mut command = Command::new(std::env::current_exe().unwrap());
@@ -11105,6 +11109,7 @@ esac
     }
 
     #[tokio::test]
+    #[cfg(not(feature = "isolated-x11"))]
     async fn raw_text_rejects_unsupported_characters_before_backend_access() {
         assert!(validate_ydotool_text("probe-0710_a/b\t\nXYZ").is_ok());
         for text in [
@@ -13738,6 +13743,7 @@ esac
     }
 
     #[test]
+    #[cfg(not(feature = "isolated-x11"))]
     fn review_invalid_text_is_rejected_before_window_targeting() {
         let dir = std::env::temp_dir().join(format!("cul-text-preflight-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -14361,6 +14367,7 @@ esac
     }
 
     #[tokio::test]
+    #[cfg(not(feature = "isolated-x11"))]
     async fn shell_execution_clears_ambient_credentials_and_accepts_explicit_env() {
         let _serial = SHELL_ENV_TEST_LOCK.lock().await;
         let _enabled = EnvVarGuard::set(SHELL_ENABLE_ENV, "1");
@@ -16211,6 +16218,7 @@ mod node_target_scope_tests {
 #[cfg(test)]
 mod post_action_capture_tests {
     use super::*;
+    #[cfg(not(feature = "isolated-x11"))]
     use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -16236,6 +16244,7 @@ mod post_action_capture_tests {
         (result, probes.load(Ordering::SeqCst) != cached)
     }
 
+    #[cfg(not(feature = "isolated-x11"))]
     fn solid_png(width: u32, height: u32) -> Vec<u8> {
         let img = image::RgbaImage::from_pixel(width, height, image::Rgba([32, 128, 192, 255]));
         let mut out = Vec::new();
@@ -16416,6 +16425,7 @@ mod post_action_capture_tests {
     }
 
     #[test]
+    #[cfg(not(feature = "isolated-x11"))]
     fn post_action_capture_executes_after_action_and_preserves_action_ok_on_capture_failure() {
         let dir = std::env::temp_dir().join(format!(
             "cul-post-action-capture-{}-{}",
@@ -17194,7 +17204,7 @@ mod tree_spill_server_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "isolated-x11")))]
 mod pixelflux_routing_tests {
     use super::pixelflux_point_for_element;
     use crate::remote_desktop::LogicalMonitor;
@@ -17556,5 +17566,31 @@ mod pixelflux_routing_tests {
             .status()
             .unwrap();
         assert!(status.success(), "{status}");
+    }
+}
+
+#[cfg(all(test, feature = "isolated-x11"))]
+mod isolation_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn shared_input_is_rejected_before_backend_discovery() {
+        assert!(run_ydotool(&[]).await.unwrap_err().contains("forbidden"));
+        assert!(run_ydotool_type_text("never send this")
+            .await
+            .unwrap_err()
+            .contains("forbidden"));
+        assert!(crate::abs_pointer::AbsPointer::create(100, 100)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("forbidden"));
+        let server = ComputerUseLinux::default();
+        assert!(server.should_prefer_xdotool_keyboard());
+        assert!(server.should_prefer_xdotool_pointer());
+        assert!(!server.should_prefer_portal_pointer_backend().await);
+        assert!(!server.should_prefer_portal_text_backend());
+        assert!(!server.should_prefer_portal_keyboard_for_chords().await);
+        assert!(!shell_execution_enabled());
     }
 }

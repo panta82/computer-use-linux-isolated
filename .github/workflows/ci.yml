@@ -17,7 +17,10 @@ jobs:
       - run: target/debug/computer-use-linux-isolated --help
       - run: python3 -m py_compile desktop/*.py
       - run: python3 scripts/test-desktop-manager.py
+      - run: python3 scripts/test-session-startup.py
+      - run: cargo test --locked --test library_exports --test session_hydration
       - run: bash -n install.sh
+      - run: bash -n scripts/build-xfdesktop.sh
       - name: Shared-input builds must be rejected
         run: |
           if cargo check --no-default-features 2> /tmp/rejected.log; then exit 1; fi
