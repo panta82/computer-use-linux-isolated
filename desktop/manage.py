@@ -100,7 +100,8 @@ if ARGS and ARGS[0]=='desktop':
         sys.exit(0)
     if cmd=='view':
         environment()
-        os.execvp('vncviewer',['vncviewer','-PasswordFile',str(BASE/'view-password'),'-AcceptBell=0','127.0.0.1:99'])
+        # Bells are disabled by x11vnc -nobell; TigerVNC 1.13 has no AcceptBell option.
+        os.execvp('vncviewer',['vncviewer','-PasswordFile',str(BASE/'view-password'),'127.0.0.1:99'])
     if cmd!='run' or len(ARGS)<3: sys.exit('Usage: '+NAME+' desktop run PROGRAM [ARGS...]')
     command=ARGS[2:]
     env=environment()
